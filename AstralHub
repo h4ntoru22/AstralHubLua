@@ -28,7 +28,7 @@ local window = library:CreateWindow({
 	Acrylic = false,
 	Transparency = false,
 	Theme = "Darker",
-	MinimizeKey = Enum.KeyCode.RightControl,
+	MinimizeKey = Enum.KeyCode.RightShift,
 })
 
 
