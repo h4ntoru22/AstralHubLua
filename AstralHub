@@ -1,0 +1,1785 @@
+--|| references ||--
+local replicatedstorage = game:GetService("ReplicatedStorage")
+local inputservice = game:GetService("UserInputService")
+local runservice = game:GetService("RunService")
+local teleportservice = game:GetService("TeleportService")
+local httpservice = game:GetService("HttpService")
+local camera = workspace.CurrentCamera
+local players = game:GetService("Players")
+local httprequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+local tweenservice = game:GetService("TweenService")
+
+local player = players.LocalPlayer
+
+
+
+
+--|| load library ||--
+local library = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local options = library.Options
+
+--|| create window ||--
+local window = library:CreateWindow({
+	Title = "ASTRAL HUB •",
+	SubTitle = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name,
+	TabWidth = 140,
+	Size = UDim2.fromOffset(700, 400),
+	Acrylic = false,
+	Transparency = false,
+	Theme = "Darker",
+	MinimizeKey = Enum.KeyCode.RightControl,
+})
+
+
+
+
+
+
+--|| global ||--
+
+local global = getgenv()
+
+global.walkspeed = global.walkspeed or player.Character.Humanoid.WalkSpeed
+
+global.flightspeed = global.flightspeed or 100
+global.flight = global.flight or false
+global.flightbind = global.flightbind or "NumLock"
+
+global.spinspeed = global.spinspeed or 20
+global.fullbright = global.fullbright or false
+global.infinitejump = global.infinitejump or false
+global.noclip = global.noclip or false
+
+--|| functions ||--
+
+
+
+local function fly(enable)
+
+
+	local control = { f = 0, b = 0, l = 0, r = 0, u = 0, d = 0 }
+	local speed = global.flightspeed
+	local gyro, velocity
+
+	if enable then
+		gyro = Instance.new("BodyGyro")
+		gyro.P = 9e4
+		gyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+		gyro.CFrame = player.Character.HumanoidRootPart.CFrame
+		gyro.Parent = player.Character.HumanoidRootPart
+
+		velocity = Instance.new("BodyVelocity")
+		velocity.MaxForce = Vector3.one * math.huge
+		velocity.Velocity = Vector3.zero
+		velocity.Parent = player.Character.HumanoidRootPart
+
+		player.Character.Humanoid.PlatformStand = true
+		camera.CameraType = Enum.CameraType.Track
+
+		local mouse = player:GetMouse()
+		local kd = mouse.KeyDown:Connect(function(k)
+			k = k:lower()
+			if k == "w" then control.f = -1
+			elseif k == "s" then control.b = 1
+			elseif k == "a" then control.l = -1
+			elseif k == "d" then control.r = 1
+			elseif k == "e" then control.u = -1
+			elseif k == "q" then control.d = 1 end
+		end)
+
+		local ku = mouse.KeyUp:Connect(function(k)
+			k = k:lower()
+			if k == "w" then control.f = 0
+			elseif k == "s" then control.b = 0
+			elseif k == "a" then control.l = 0
+			elseif k == "d" then control.r = 0
+			elseif k == "e" then control.u = 0
+			elseif k == "q" then control.d = 0 end
+		end)
+
+		task.spawn(function()
+	while enable and gyro and velocity and player.Character do
+		task.wait()
+		local move = Vector3.new(
+			control.r + control.l,
+			control.u + control.d,
+			control.f + control.b
+		)
+		if move.Magnitude > 0 then
+			move = camera.CFrame:VectorToWorldSpace(move.Unit) * global.flightspeed  
+		else
+			move = Vector3.zero
+		end
+		velocity.Velocity = move
+		gyro.CFrame = camera.CFrame
+	end
+end)
+
+	else
+		for _, inst in pairs(player.Character.HumanoidRootPart:GetChildren()) do
+			if inst:IsA("BodyGyro") or inst:IsA("BodyVelocity") then
+				inst:Destroy()
+			end
+		end
+
+		for _, conn in pairs(getconnections(player:GetMouse().KeyDown)) do conn:Disconnect() end
+		for _, conn in pairs(getconnections(player:GetMouse().KeyUp)) do conn:Disconnect() end
+
+		player.Character.Humanoid.PlatformStand = false
+		camera.CameraType = Enum.CameraType.Custom
+	end
+end
+
+
+local function checkrig()
+	local character = players.LocalPlayer.Character or players.LocalPlayer.CharacterAdded:Wait()
+	local humanoid = character:WaitForChild("Humanoid")
+	
+	if humanoid.RigType == Enum.HumanoidRigType.R6 then
+		return "R6"
+	else
+		return "R15"
+	end
+end
+
+local function customclipboard(text)
+   local clipboard = setclipboard or toclipboard or set_clipboard or (Clipboard and Clipboard.set)
+   clipboard(tostring(text))
+end
+
+local function createdivider(tab, text)
+	tab:AddParagraph({
+    Title = '<font size="15"><b>'..text..'</b></font>',
+    Content = ""
+})
+end
+
+local function createline(tab)
+	tab:AddParagraph({
+	Title = "line",
+	Content = ""
+})
+end
+
+local function createloop(id, func)
+	global.loops = global.loops or {}
+
+	if global.loops[id] then
+		global.loops[id].running = false
+		global.loops[id] = nil
+	end
+
+	local loop = { running = true }
+	global.loops[id] = loop
+
+	task.spawn(function()
+		while loop.running do
+			task.wait()
+			func()
+		end
+	end)
+end
+
+local function stoploop(id)
+	if global.loops and global.loops[id] then
+		global.loops[id].running = false
+		global.loops[id] = nil
+	end
+end
+
+
+--|| tabs ||--
+
+local tabs = {
+	main = window:AddTab({
+		Title = "Main",
+		Icon = "layout-dashboard",
+	}),
+    game = window:AddTab({
+        Title = "Real Futbol",
+        Icon = "gamepad-2",
+    }),
+	misc = window:AddTab({
+		Title = "Miscellaneous",
+		Icon = "puzzle",
+	}),
+	scripts = window:AddTab({
+		Title = "Scripts",
+		Icon = "scroll",
+	}),
+	options = window:AddTab({
+		Title = "Options",
+		Icon = "settings-2",
+	}),
+}
+
+
+
+
+
+--[[
+███╗   ███╗ █████╗ ██╗███╗   ██╗
+████╗ ████║██╔══██╗██║████╗  ██║
+██╔████╔██║███████║██║██╔██╗ ██║
+██║╚██╔╝██║██╔══██║██║██║╚██╗██║
+██║ ╚═╝ ██║██║  ██║██║██║ ╚████║
+╚═╝     ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝
+                                
+]]
+
+
+createdivider(tabs.main, "Player")
+
+
+local playerteleportinput = tabs.main:AddInput("teleport_input", {
+	Title = "Teleport to Player",
+	Default = "",
+	Placeholder = "Username",
+	Finished = true,
+	Callback = function(value)
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+
+		value = string.lower(value)
+
+		for _, other in ipairs(game.Players:GetPlayers()) do
+			if other ~= player then
+				local name = other.Name:lower()
+				local display = other.DisplayName:lower()
+
+				if string.find(name, value) or string.find(display, value) then
+					local otherroot = other.Character and other.Character:FindFirstChild("HumanoidRootPart")
+					if otherroot then
+						root.CFrame = otherroot.CFrame
+					end
+					return
+				end
+			end
+		end
+
+	end,
+})
+
+local walkspeedslider = tabs.main:AddSlider("walkspeed_slider", {
+	Title = "Set <b>Walk Speed</b>",
+	Default = global.walkspeed,
+	Min = 0,
+	Max = 1000,
+	Rounding = 0,
+	Callback = function(value)
+		player.Character.Humanoid.WalkSpeed = value
+		global.walkspeed = value
+	end
+})
+
+
+
+
+createdivider(tabs.main, "Flight")
+
+
+local flighttoggle = tabs.main:AddToggle("flight_toggle", {
+	Title = "Toggle <b>Flight</b> ",
+	Default = global.flight,
+	Callback = function(value)
+		global.flight = value
+		fly(value)
+	end
+})
+
+local flightbind = tabs.main:AddKeybind("flight_bind", {
+	Title = "Set <b>Flight Bind</b>",
+	Default = global.flightbind,
+	Mode = "Toggle",
+	Callback = function()
+		flighttoggle:SetValue(not global.flight)
+		fly(global.flight)
+	end
+})
+
+local flightslider = tabs.main:AddSlider("flight_slider", {
+	Title = "Set <b>Flight Speed</b>",
+	Default = global.flightspeed,
+	Min = 0,
+	Max = 1000,
+	Rounding = 0,
+	Callback = function(value)
+		global.flightspeed = value
+	end
+})
+
+
+
+
+
+
+--[[
+ ██████╗  █████╗ ███╗   ███╗███████╗
+██╔════╝ ██╔══██╗████╗ ████║██╔════╝
+██║  ███╗███████║██╔████╔██║█████╗  
+██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  
+╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗
+ ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝
+                                    
+]]
+
+
+
+
+
+
+--|| CONNECTIONS ||--
+global.scriptconnection = global.scriptconnection or nil
+
+--|| REACH SETTINGS ||--
+global.reach = {
+	enabled = false,
+	distance = 10,
+	animations = {
+		all = {}
+	}
+}
+
+--|| AUTO FEATURES ||--
+global.auto = {
+	freekick = false,
+}
+
+--|| GAME STATES ||--
+global.states = {
+	inpenalty = false,
+	infreekick = false,
+}
+
+--|| MODIFICATIONS ||--
+global.modifications = {
+	enabled = false,
+	defaultValues = {},
+	customValues = {
+		maxPower = 200,
+		minPower = 1,
+		maxHeight = 150,
+		minHeight = 0,
+		chargeSpeed = 0.75,
+	}
+}
+
+--|| MISC FLAGS ||--
+global.ballprediction = {}
+global.ballprediction.enabled = global.ballprediction.enabled or false
+global.ballprediction.color = global.ballprediction.color or false
+
+
+global.speedboost = global.speedboost or false
+global.speedboostmultiplier = global.speedboostmultiplier or 5
+global.infinitestamina = global.infinitestamina or false
+
+global.animations = {
+	all = {},
+	skills = {},
+
+}
+
+local animationsLoaded = false
+local animationsTable = global.animations.all 
+local animationsFolder = replicatedstorage:FindFirstChild("game")
+if not animationsFolder then return end
+
+local toolsfolder = animationsFolder:FindFirstChild("animations")
+toolsfolder = toolsfolder and toolsfolder:FindFirstChild("Tools")
+if not toolsfolder then return end
+
+for _, animation in ipairs(toolsfolder:GetDescendants()) do
+	if animation:IsA("Animation") then
+		animationsTable[animation.AnimationId] = true
+	end
+end
+
+animationsLoaded = true
+
+
+
+--|| INTERNAL STATES ||--
+
+local currentFreekickTween = nil
+local currentPenaltyTween = nil
+
+
+
+local celebrationAnimations = {
+    ["Fist Pump"] = "rbxassetid://18545628047",
+    ["Right Here Right Now"] = "rbxassetid://18548417924",
+    ["Tshabalala"] = "rbxassetid://18673725349",
+    ["Archer Slide"] = "rbxassetid://18560742891",
+    ["Point Up"] = "rbxassetid://18563918200",
+    ["The Griddy"] = "rbxassetid://18774591442",
+    ["Boxing"] = "rbxassetid://18584841032",
+    ["Glorious"] = "rbxassetid://18584847345",
+    ["Yoga"] = "rbxassetid://18673721840",
+    ["Calma"] = "rbxassetid://18673636723",
+    ["Shivering"] = "rbxassetid://18673647071",
+    ["Folded Arms Knee Slide"] = "rbxassetid://18673668417",
+    ["Gunleann"] = "rbxassetid://18673677815",
+    ["Knockout"] = "rbxassetid://18673687513",
+    ["Salute Knee Slide"] = "rbxassetid://18673699107",
+    ["Meditation"] = "rbxassetid://18673705797",
+    ["Ice Cold"] = "rbxassetid://18745497583",
+    ["Catwalk"] = "rbxassetid://18775156520",
+    ["Backflip"] = "rbxassetid://18926012773",
+    ["Double Siuuu"] = "rbxassetid://18926038745",
+    ["Prayer"] = "rbxassetid://18926177589",
+    ["Folded Arms"] = "rbxassetid://18926195587",
+    ["Spanish Dance"] = "rbxassetid://18926223307",
+    ["Pigeon"] = "rbxassetid://109637224628241",
+    
+}
+
+
+
+--|| HELPER FUNCTIONS ||--
+
+local function getBall(get_closest)
+	local success, result = pcall(function()
+		local char = player.Character
+		local root = char and char:FindFirstChild("HumanoidRootPart")
+		local player_pos = root and root.Position
+		if not player_pos then
+			return get_closest and nil or {}
+		end
+
+		local closest, shortest = nil, math.huge
+		local balls = {}
+
+		for _, obj in ipairs(workspace.game:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				if obj:GetAttribute("networkOwner") or obj:GetAttribute("lastTouch") then
+					local dist = (obj.Position - player_pos).Magnitude
+
+					if get_closest then
+						if dist < shortest then
+							shortest = dist
+							closest = obj
+						end
+					else
+						table.insert(balls, obj)
+					end
+				end
+			end
+		end
+
+		if get_closest then
+			if closest then
+			end
+			return closest
+		else
+			return balls
+		end
+	end)
+
+	if not success then
+		return get_closest and nil or {}
+	end
+
+	return result
+end
+
+local function isNetworkOwner(part)
+	if not part then return false end
+
+	local attr = part:GetAttribute("networkOwner")
+	if attr then
+		return attr == game.Players.LocalPlayer.UserId
+	else
+		return part.ReceiveAge == 0 and gethiddenproperty(part, "NetworkIsSleeping") == false
+	end
+end
+
+
+--|| reach section --||
+
+
+createdivider(tabs.game, "Reach")
+
+local reachtoggle = tabs.game:AddToggle("reach_toggle", {
+    Title = "Toggle <b>Reach</b>",
+    Default = global.reach.enabled,
+    Callback = function(value)
+        global.reach.enabled = value
+    end
+})
+
+local reachslider = tabs.game:AddSlider("reach_slider", {
+    Title = "Set <b>Reach Distance</b>",
+    Default = global.reach.distance,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(value)
+        global.reach.distance = value
+    end
+})
+
+local reachvisualtoggle = tabs.game:AddToggle("reachvisual_toggle", {
+    Title = "Show <b>Reach Visualizer</b>",
+    Default = global.reach.visualizer,
+    Callback = function(value)
+
+        global.reach.visualizer = value
+
+        if value then
+
+            local newBox = Instance.new("Part")
+            newBox.Parent = workspace.game.debug
+            newBox.Name = "ReachVisualizer"
+            newBox.CanCollide = false
+            newBox.Massless = true
+            newBox.CFrame = player.Character.HumanoidRootPart.CFrame
+            newBox.CastShadow = false
+			newBox.Material = "Neon"
+            newBox.Transparency = 0.5
+			newBox.TopSurface = "Smooth"
+            newBox.BrickColor = BrickColor.Black()
+	
+            local selectionBox = Instance.new("SelectionBox")
+            selectionBox.Parent = newBox
+            selectionBox.Adornee = newBox
+            selectionBox.LineThickness = 0.01
+            selectionBox.Transparency = 0
+            selectionBox.Color3 = Color3.fromRGB(31, 10, 10)
+
+
+            local motor6D = Instance.new("Motor6D")
+            motor6D.Part0 = player.Character.HumanoidRootPart
+            motor6D.Part1 = newBox
+            motor6D.C0 = CFrame.new(0, 0, 0)
+            motor6D.C1 = CFrame.new(0, 0, 0)
+            motor6D.Parent = player.Character.HumanoidRootPart
+
+            local direction = 1
+            while value do
+                task.wait()
+                local currentThickness = selectionBox.LineThickness
+                if currentThickness >= 0.1 then
+                    direction = -.1
+                elseif currentThickness <= 0.01 then
+                    direction = .1
+                end
+                selectionBox.LineThickness = currentThickness + direction * 0.01
+
+                newBox.Size = Vector3.one * global.reach.distance * 1.6				
+            end
+
+        else
+
+            local existingBox = workspace.game.debug:FindFirstChild("ReachVisualizer")
+            if existingBox then
+                existingBox:Destroy()
+            end
+
+        end
+
+    end
+})
+
+
+
+--|| player section --||
+
+createdivider(tabs.game, "Player")
+
+local staminatoggle = tabs.game:AddToggle("stamina_toggle", {
+    Title = "Toggle <b>Infinite Stamina</b>",
+    Default = global.infinitestamina,
+    Callback = function(value)
+        global.infinitestamina = value
+
+		if global.infinitestamina then
+			createloop("infinitestamina", function()
+				 task.spawn(function()
+            local controller = player:FindFirstChild("PlayerScripts")
+            if controller and controller:FindFirstChild("controllers") then
+                local movement = controller.controllers:FindFirstChild("movementController")
+                if movement and movement:FindFirstChild("stamina") then
+                    movement.stamina.Value = 100
+                end
+            end
+        end)
+			end)
+		end
+    end
+})
+
+local speedboosttoggle = tabs.game:AddToggle("speedboost_toggle", {
+	Title = "Toggle <b>Speed Boost</b>",
+	Default = global.speedboost,
+	Callback = function(value)
+		global.speedboost = value
+		if global.speedboost then
+			createloop("speedboost", function()
+				if player.Character == nil then return end
+
+				if player.Character.Humanoid.MoveDirection.Magnitude > 0 then
+			        player.Character:TranslateBy(player.Character.Humanoid.MoveDirection * global.speedboostmultiplier * runservice.Heartbeat:Wait() * 5)
+		        end
+			end)
+		else
+			stoploop("speedboost")
+		end
+	end
+})
+
+local speedboostslider = tabs.game:AddSlider("speedboost_slider", {
+	Title = "Set <b>Speed Boost Multiplier</b>",
+	Default = global.speedboostmultiplier,
+	Min = 1,
+	Max = 10,
+	Rounding = 0,
+	Callback = function(value)
+		global.speedboostmultiplier = value / 10
+	end
+})
+
+createline(tabs.game)
+
+local outstore = {}
+local antiouttoggle = tabs.game:AddToggle("antiout_toggle", {
+	Title = "Anti-Out (You can dribble outside the pitch)",
+	Default = global.antiout,
+	Callback = function(value)
+		global.antiout = value
+
+		if global.antiout then
+			for _, part in workspace.game.system.out:GetChildren() do
+				if table.find({ "AwayLeft", "AwayRight", "HomeLeft", "HomeRight", 
+            "ThrowInFarSide", "ThrowInTunnelSide"}, part.Name) then
+				outstore[part.Name] = part.Parent
+				part.Parent = nil
+			end
+			end
+		else
+			for partName, originalParent in pairs(outstore) do
+                local restoredPart = workspace.game.system.out:FindFirstChild(partName)
+                if restoredPart then
+                    restoredPart.Parent = originalParent
+                end
+            end
+            outstore = {}
+		end
+
+	end
+})
+
+tabs.game:AddButton({
+	Title = "Use <b>Pitch Teleport</b>",
+	Callback = function()
+		  for _, revent in pairs(replicatedstorage:WaitForChild("network"):WaitForChild("Shared"):GetChildren()) do
+			if revent:IsA("RemoteEvent") then
+				local ohNumber1 = 1000
+				local ohString2 = "pitchTeleporter"
+				revent:FireServer(ohNumber1, ohString2)
+			end
+		end
+	end
+})
+
+
+--|| auto section --||
+
+createdivider(tabs.game, "Auto")
+
+local freekicktoggle = tabs.game:AddToggle("freekick_toggle", {
+    Title = "Auto <b>Freekick</b>",
+    Default = global.auto.freekick,
+    Callback = function(value)
+        global.auto.freekick = value
+    end
+})
+
+local penaltytoggle = tabs.game:AddToggle("penalty_toggle", {
+    Title = "Auto <b>Penalty</b>",
+    Default = global.auto.penalty,
+    Callback = function(value)
+        global.auto.penalty = value
+    end
+})
+
+createdivider(tabs.game, "Visuals")
+
+--|| visuals section --||
+
+local ballpredicttoggle = tabs.game:AddToggle("ballpredict_toggle", {
+    Title = "Toggle <b>Ball Prediction</b>",
+    Default = global.ballprediction,
+    Callback = function(value)
+        global.ballprediction.enabled = value
+
+        if global.ballprediction.enabled then
+            createloop("ballprediction", function()
+                task.wait()
+
+                local balls = getBall(false)
+
+                if #balls == 0 then
+                    for _, v in pairs(workspace:GetChildren()) do
+                        if v:IsA("Part") and v.Name == "prediction_dot" then
+                            v:Destroy()
+                        end
+                    end
+                    return
+                end
+
+                local function quadraticSolver(a, b, c)
+                    local x1 = (-b + math.sqrt((b * b) - 4 * a * c)) / (2 * a)
+                    local x2 = (-b - math.sqrt((b * b) - 4 * a * c)) / (2 * a)
+                    return x2 > x1 and x2 or x1
+                end
+
+                local function createPredictionDot(pos, size)
+                    local dot = Instance.new("Part")
+                    dot.Name = "prediction_dot"
+                    dot.Shape = Enum.PartType.Ball
+                    dot.Size = Vector3.new(size, size, size)
+                    dot.Color = global.ballprediction.color
+                    dot.Anchored = true
+                    dot.CanCollide = false
+                    dot.Position = pos
+                    dot.Parent = workspace
+
+                    return dot
+                end
+
+                local function getBodyForce(ball)
+                    local success, bodyForce = pcall(function()
+                        return ball:FindFirstChild("BodyForce") 
+                    end)
+
+                    if success and bodyForce then
+                        return bodyForce
+                    end
+
+                    return nil
+                end
+
+                table.sort(balls, function(a, b)
+                    local da = (a.Position - player.Character.RightBoot.Position).Magnitude
+                    local db = (b.Position - player.Character.RightBoot.Position).Magnitude
+                    return da < db
+                end)
+
+                local predictionDots = {}
+                local closestBalls = {balls[1], balls[2], balls[3]}
+
+                for _, v in pairs(workspace:GetChildren()) do
+                    if v:IsA("Part") and v.Name == "prediction_dot" then
+                        v:Destroy()
+                    end
+                end
+
+				local groundHeight = player.Character.RightBoot.Position.Y
+
+                for _, ball in ipairs(closestBalls) do
+                    if ball and ball.Velocity.Magnitude > 30 then
+                        local pos = ball.Position
+                        local vel = ball.Velocity
+                        local steps = 30
+                        local dur = 2
+                        local step = dur / steps
+
+                        local bodyForce = getBodyForce(ball)
+                        local forceDirection = bodyForce and bodyForce.Force.Unit or Vector3.new(0, 0, 0)  
+                        local forceMagnitude = bodyForce and bodyForce.Force.Magnitude or 0  
+
+                        local lastDotPos
+
+                        for i = 1, steps do
+                            local t = i * step
+
+                            local decayFactor = math.exp(-t * .75) 
+                            local decayedForce = forceDirection * (forceMagnitude * decayFactor)
+
+                            local forceAcceleration = decayedForce / ball:GetMass()
+                            local newVelocity = vel + forceAcceleration * t
+
+                            local horizontalVelocity = Vector3.new(newVelocity.X, 0, newVelocity.Z)
+                            local horizontalDisplacement = horizontalVelocity * t
+
+                            local verticalDisplacement = Vector3.new(0, newVelocity.Y * t + 0.2 * -workspace.Gravity * t * t, 0)
+
+                            local dotpos = pos + horizontalDisplacement + verticalDisplacement
+
+                            if dotpos.Y <= groundHeight then
+                                break
+                            end
+
+                            table.insert(predictionDots, createPredictionDot(dotpos, 0.8))
+
+                            lastDotPos = dotpos
+                        end
+
+                        if lastDotPos then
+                            local landingDotPos = Vector3.new(lastDotPos.X, groundHeight, lastDotPos.Z)
+
+                            table.insert(predictionDots, createPredictionDot(landingDotPos, 1.6))
+                        end
+                    end
+                end
+
+                task.delay(3, function()
+                    for _, dot in ipairs(predictionDots) do
+                        if dot and dot.Parent then
+                            dot:Destroy()
+                        end
+                    end
+                end)
+            end)
+		else
+			stoploop("ballprediction")
+        end
+    end
+})
+
+local ballpredictpicker = tabs.game:AddColorpicker("ballpredict_picker", {
+	Title = "Set <b>Ball Prediction</b> Color",
+	Default = Color3.fromRGB(255, 255, 255)
+})
+
+local matchsettingsbtn = tabs.game:AddButton({
+	Title = "Customize <b>Match Settings</b>",
+	Callback = function()
+		local player = game.Players.LocalPlayer
+        local matchSettings = player:WaitForChild("PlayerScripts"):WaitForChild("visuals"):WaitForChild("matchSettings")
+        matchSettings:SetAttribute("toggle", true)
+	end
+})
+
+tabs.game:AddParagraph({
+	Title = "notice:",
+	Content = "this is FE, everyone will be affected by this"
+})
+
+
+--|| mods section --||
+
+local mods = global.modifications
+
+mods.defaultValues = {} 
+
+local function apply_mods(enabled)
+    for _, foldername in ipairs({"kick", "pass", "gk"}) do
+        local folder = player:WaitForChild("PlayerScripts"):WaitForChild("mechanics"):FindFirstChild(foldername)
+        if folder and folder:FindFirstChild("binds") then
+            for _, module in ipairs(folder.binds:GetChildren()) do
+                if module:IsA("ModuleScript") then
+                    local success, required = pcall(require, module)
+                    if success and typeof(required) == "table" then
+                        if typeof(required.chargeSpeed) == "number" and typeof(required.maxPower) == "number" and typeof(required.minPower) == "number" then
+
+                            if not mods.defaultValues[module] then
+                                mods.defaultValues[module] = {
+                                    chargeSpeed = required.chargeSpeed,
+                                    maxPower = required.maxPower,
+                                    minPower = required.minPower
+                                }
+                            end
+
+                            if enabled then
+                                required.chargeSpeed = mods.customValues.chargeSpeed
+                                required.maxPower = mods.customValues.maxPower
+                                required.minPower = mods.customValues.minPower
+                            else
+                                local def = mods.defaultValues[module]
+                                required.chargeSpeed = def.chargeSpeed
+                                required.maxPower = def.maxPower
+                                required.minPower = def.minPower
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+
+
+createdivider(tabs.game, "Modifications")
+
+local modificationtoggle = tabs.game:AddToggle("mods_toggle", {
+    Title = "Toggle <b>Modifications</b>",
+    Default = global.modifications.enabled,
+    Callback = function(value)
+        mods.enabled = value
+        apply_mods(value)
+      
+    end
+})
+
+
+local maxpowerslider = tabs.game:AddSlider("max_power_slider", {
+    Title = "Set <b>Maximum Kick Power</b>",
+    Default = mods.customValues.maxPower,
+    Min = 1,
+    Max = 400,
+    Rounding = 0,
+    Callback = function(value)
+        global.modifications.customValues.maxPower = value
+
+        if global.modifications.enabled then
+             apply_mods(true)
+        end
+    end
+})
+
+local minpowerslider = tabs.game:AddSlider("min_power_slider", {
+    Title = "Set <b>Minimum Kick Power</b>",
+    Default = mods.customValues.minPower,
+    Min = 1,
+    Max = 400,
+    Rounding = 0,
+    Callback = function(value)
+        global.modifications.customValues.minPower = value
+
+         if global.modifications.enabled then
+             apply_mods(true)
+        end
+    end
+})
+
+createline(tabs.game)
+
+
+local maxheightslider = tabs.game:AddSlider("max_height_slider", {
+    Title = "Set <b>Maximum Kick Height</b>",
+    Default = mods.customValues.maxHeight,
+    Min = 1,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(value)
+        global.modifications.customValues.maxHeight = value
+
+        if global.modifications.enabled then
+            apply_mods(true)
+        end
+    end
+})
+
+local minheightslider = tabs.game:AddSlider("minimum_height_slider", {
+    Title = "Set <b>Minimum Kick Height</b>",
+    Default = mods.customValues.minHeight,
+    Min = 1,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(value)
+        global.modifications.customValues.minHeight = value
+
+        if global.modifications.enabled then
+            apply_mods(true)
+        end
+    end
+})
+
+createline(tabs.game)
+
+local chargespeedslider = tabs.game:AddSlider("charge_speed_slider", {
+    Title = "Set <b>Kick Bar Speed</b>",
+    Default = mods.customValues.chargeSpeed,
+    Min = 0.01,
+    Max = 2,  
+    Rounding = 2,
+    Callback = function(value)
+        global.modifications.customValues.chargeSpeed = value
+
+           if global.modifications.enabled then
+             apply_mods(true)
+        end
+    end
+})
+
+
+createdivider(tabs.game, "Ball Features")
+
+--|| ball section --||
+
+tabs.game:AddParagraph({
+	Title = "notice:",
+	Description = "Requires network ownership to work! (search it if you dont know what it is)"
+})
+
+local ballmagnettoggle = tabs.game:AddToggle("ballmag_toggle", {
+	Title = "Toggle <b>Ball Magnet</b>",
+	Description = "Constantly teleports the ball to you",
+	Callback = function(value)
+		global.ballmagnet = value
+		if global.ballmagnet then
+			createloop("ballmagnet", function()
+				local ball = getBall(true)
+				if not ball or not isNetworkOwner(ball) then return end
+				ball.CFrame = CFrame.new(player.Character.RightBoot.Position)
+			end)
+		else
+			stoploop("ballmagnet")
+		end
+	end
+})
+
+local balltelekinesistoggle = tabs.game:AddToggle("telekinesis_toggle", {
+	Title = "Toggle <b>Ball Telekinesis</b>",
+	Description = "Control the ball with your mouse",
+	Callback = function(value)
+		global.telekinesis = value
+		if global.telekinesis then
+			
+		createloop("telekinesis", function()
+	local ball = getBall(true)
+	if not ball or not isNetworkOwner(ball) then return end
+
+	local mouse = player:GetMouse()
+	local camera = workspace.CurrentCamera
+	
+	local ray = camera:ScreenPointToRay(mouse.X, mouse.Y)
+	local raycastResult = workspace:Raycast(ray.Origin, ray.Direction * 1000)
+	
+	if raycastResult and raycastResult.Instance == ball then
+		return
+	end
+	
+	local targetPos = mouse.Hit.Position
+	local dir = (targetPos - ball.Position)
+	local dist = dir.Magnitude
+	
+	ball.AssemblyLinearVelocity = dir.Unit * math.clamp(dist * 50, 0, 250)
+end)
+
+
+		else
+			stoploop("telekinesis")
+		end
+	end
+})
+
+tabs.game:AddButton({
+	Title = "Bring <b>Ball</b>",
+	Description = "Bring the ball to you",
+	Callback = function()
+		local ball = getBall(true)
+		if not ball or not isNetworkOwner(ball) then return end
+		ball.CFrame = CFrame.new(player.Character.RightBoot.Position)
+	end
+})
+
+
+
+
+
+
+--|| script connection ||--
+
+if global.scriptconnections then
+    for _, connection in pairs(global.scriptconnections) do
+        if connection and connection.Disconnect then
+            connection:Disconnect()
+        end
+    end
+
+	for key, _ in pairs(global.scriptconnections) do
+        global.scriptconnections[key] = nil
+    end
+end
+
+global.scriptconnections = global.scriptconnections or {} 
+
+
+global.scriptconnections.reach = player.Character.Humanoid.AnimationPlayed:Connect(function(track)
+    if not animationsLoaded then
+        return
+    end
+
+    if not (global.reach.enabled and track and track.Animation) then return end
+
+    local animId = track.Animation.AnimationId
+    if not global.animations.all[animId] then
+        return
+    end
+
+    local ball = getBall(true)
+    if not ball then
+        return
+    end
+
+    if typeof(isnetworkowner) ~= "function" then
+    end
+
+    if not isnetworkowner(ball) then
+        return
+    end
+
+    local distance = (ball.Position - player.Character.HumanoidRootPart.Position).Magnitude
+
+    if distance >= global.reach.distance then
+        return
+    end
+
+    local origCFrame = ball.CFrame
+
+    local parent_folder = ball.Parent
+    local grandparent = parent_folder and parent_folder.Parent
+
+    local mesh = nil
+    if grandparent then
+        for _, sibling_folder in ipairs(grandparent:GetChildren()) do
+            if sibling_folder:IsA("Folder") and sibling_folder ~= parent_folder then
+                for _, obj in ipairs(sibling_folder:GetDescendants()) do
+                    if obj:IsA("BasePart") then
+                        local design_folder = obj:FindFirstChild("design")
+                        if design_folder then
+                            mesh = design_folder:FindFirstChildWhichIsA("MeshPart", true)
+                            if mesh then
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+            if mesh then break end
+        end
+    end
+
+    if not mesh then
+        return
+    end
+
+
+    mesh.Transparency = 1
+    ball.CFrame = player.Character.HumanoidRootPart.CFrame
+    ball.CanCollide = false
+
+    task.wait()
+
+    ball.CFrame = origCFrame
+    ball.CanCollide = true
+    mesh.Transparency = 0
+
+end)
+
+
+
+global.scriptconnections.freekick = runservice.RenderStepped:Connect(function()
+    if global.auto.freekick  then
+
+        local composureframe
+
+        pcall(function()
+            local playergui = player:FindFirstChild("PlayerGui")
+            if not playergui then return end
+
+            local billboardui = playergui:FindFirstChild("billboardUI")
+            if not billboardui then return end
+
+            for _, overlay in pairs(billboardui:GetChildren()) do
+                if overlay.Name == "Overlay" then
+                    local main = overlay:FindFirstChild("Main")
+                    if main then
+                        local container = main:FindFirstChild("Container")
+                        if container then
+                            local maybecomposure = container:FindFirstChild("Composure")
+                            if maybecomposure then
+                                composureframe = maybecomposure
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+
+            if composureframe then
+                global.states.infreekick = true
+            else
+                global.states.infreekick = false
+            end
+        end)
+
+        if global.states.infreekick  and composureframe then
+            if currentFreekickTween then
+                currentFreekickTween:Cancel()
+            end
+
+            composureframe.Size = UDim2.new(composureframe.Size.X.Scale, composureframe.Size.X.Offset, 0.1, composureframe.Size.Y.Offset)
+
+            local tweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+            currentFreekickTween = tweenservice:Create(composureframe, tweenInfo, {Size = UDim2.new(composureframe.Size.X.Scale, composureframe.Size.X.Offset, 0.1, composureframe.Size.Y.Offset)})
+            
+            currentFreekickTween:Play()
+            currentFreekickTween.Completed:Connect(function()
+                composureframe.Size = UDim2.new(composureframe.Size.X.Scale, composureframe.Size.X.Offset, 0.1, composureframe.Size.Y.Offset)
+            end)
+        end
+
+        
+    end
+end)
+
+
+global.scriptconnections.penalty = runservice.RenderStepped:Connect(function()
+    if global.auto.penalty then
+
+        local composurePart
+
+        pcall(function()
+            local debugFolder = workspace:FindFirstChild("game") and workspace.game:FindFirstChild("debug")
+            if debugFolder then
+                local playerModel = debugFolder:FindFirstChild(player.Name)
+                if playerModel then
+                    local overlay = playerModel:FindFirstChild("Overlay")
+                    if overlay then
+                        composurePart = overlay:FindFirstChild("Composure")
+                    end
+                end
+            end
+        end)
+
+        if composurePart then
+            if currentPenaltyTween then
+                currentPenaltyTween:Cancel()
+            end
+
+            composurePart.Size = Vector3.new(3, 5, 3)
+
+            local tweenInfo = TweenInfo.new(.075, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+            currentPenaltyTween = tweenservice:Create(composurePart, tweenInfo, {Size = Vector3.new(3, 5, 3)})
+
+            currentPenaltyTween:Play()
+            currentPenaltyTween.Completed:Connect(function()
+                composurePart.Size = Vector3.new(3, 5, 3)
+            end)
+        end
+    end
+end)
+
+
+inputservice.InputEnded:Connect(function(input, gameProcessed)
+     if gameProcessed then return end
+
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
+        if global.states.infreekick  then
+            game:GetService("VirtualInputManager").SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            task.wait()
+            game:GetService("VirtualInputManager").SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+         end
+     end
+end)
+
+
+--|| misc tab ||--
+
+
+
+--|| LIGHTING ||--
+createdivider(tabs.misc, "Lighting")
+
+
+local fullbrighttoggle = tabs.misc:AddToggle("fullbright_toggle", {
+	Title = "Fullbright",
+	Default = false,
+	Callback = function(value)
+		local lighting = game:GetService("Lighting")
+
+		global.fullbright = value
+
+		if value then
+			global.originalLighting = {
+				Ambient = lighting.Ambient,
+				OutdoorAmbient = lighting.OutdoorAmbient,
+				Brightness = lighting.Brightness
+			}
+
+			lighting.Ambient = Color3.fromRGB(255, 255, 255) 
+			lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+			lighting.Brightness = 2 
+
+			fullbrightLoop = game:GetService("RunService").Heartbeat:Connect(function()
+				if global.fullbright then
+					lighting.Ambient = Color3.fromRGB(255, 255, 255)
+					lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+					lighting.Brightness = 1.5
+				else
+					if global.originalLighting then
+						lighting.Ambient = global.originalLighting.Ambient
+						lighting.OutdoorAmbient = global.originalLighting.OutdoorAmbient
+						lighting.Brightness = global.originalLighting.Brightness
+					end
+					if fullbrightLoop then
+						fullbrightLoop:Disconnect()
+					end
+				end
+			end)
+		else
+			if global.originalLighting then
+				lighting.Ambient = global.originalLighting.Ambient
+				lighting.OutdoorAmbient = global.originalLighting.OutdoorAmbient
+				lighting.Brightness = global.originalLighting.Brightness
+			end
+
+			if fullbrightLoop then
+				fullbrightLoop:Disconnect()
+			end
+		end
+	end
+})
+
+--|| MOVEMENT ||--
+createdivider(tabs.misc, "Movement")
+
+
+local infinitejumptoggle = tabs.misc:AddToggle("infjump_toggle", {
+	Title = "Toggle <b>Infinite Jump</b>",
+	Default = global.infinitejump,
+	Callback = function(value)
+		global.infinitejump = value
+
+		if value then
+			if infJump then infJump:Disconnect() end
+			infJumpDebounce = false
+			infJump = inputservice.JumpRequest:Connect(function()
+				if not infJumpDebounce then
+					infJumpDebounce = true
+					local humanoid = player.Character:FindFirstChildWhichIsA("Humanoid")
+					if humanoid then
+						humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+					end
+					task.wait()
+					infJumpDebounce = false
+				end
+			end)
+		else
+			if infJump then
+				infJump:Disconnect()
+			end
+		end
+	end
+})
+
+local loopnocliptoggle = tabs.misc:AddToggle("noclip_toggle", {
+	Title = "Toggle <b>Noclip</b>",
+	Default = false,
+	Callback = function(value)
+		local character = player.Character or player.CharacterAdded:Wait()
+		local RunService = game:GetService("RunService")
+
+		if value then
+			global.noclip = RunService.Stepped:Connect(function()
+				if character then
+					for _, part in ipairs(character:GetDescendants()) do
+						if part:IsA("BasePart") and (part.Name:lower():find("head") or part.Name:lower():find("torso")) then
+							part.CanCollide = false
+						end
+					end
+				end
+			end)
+		else
+			if global.noclip then
+				global.noclip:Disconnect()
+				global.noclip = nil
+			end
+			if character then
+				for _, part in ipairs(character:GetDescendants()) do
+					if part:IsA("BasePart") and (part.Name:lower():find("head") or part.Name:lower():find("torso")) then
+						part.CanCollide = true
+					end
+				end
+			end
+		end
+	end
+})
+
+local spintoggle = tabs.misc:AddToggle("spin_toggle", {
+	Title = "Spin",
+	Default = false,
+	Callback = function(value)
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+
+		if value  then
+			local spin = Instance.new("BodyAngularVelocity")
+			spin.Name = "spinning"
+			spin.Parent = root
+			spin.MaxTorque = Vector3.new(0, math.huge, 0)
+			task.spawn(function()
+				while value  do
+					task.wait()
+					spin.AngularVelocity = Vector3.new(0, global.spinspeed, 0)
+				end
+			end)
+		else
+			local existing = root:FindFirstChild("spinning")
+			if existing then
+				existing:Destroy()
+			end
+		end
+	end
+})
+
+local spinslider = tabs.misc:AddSlider("spin_slider", {
+	Title = "Spin Speed",
+	Default = global.spinspeed,
+	Min = 1,
+	Max = 1000,
+	Rounding = 0,
+	Callback = function(value)
+		global.spinspeed = value
+	end
+})
+
+--|| ANIMATIONS ||--
+createdivider(tabs.misc, "Animations")
+
+local jerktoggle = tabs.misc:AddToggle("jerk_toggle", {
+	Title = "Jerk Off",
+	Default = false,
+	Callback = function(value)
+		global.jerking = value
+
+		local character = player.Character or player.CharacterAdded:Wait()
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		if not humanoid then return end
+
+		if value then
+			task.spawn(function()
+				while global.jerking do
+					local animation = Instance.new("Animation")
+					animation.AnimationId = (checkrig() == "R6" and "rbxassetid://72042024" or "rbxassetid://698251653")
+					animation.Name = "jerk"
+
+					local track = humanoid:LoadAnimation(animation)
+					track:Play()
+					track.TimePosition = 0.6
+
+					while global.jerking and track and track.TimePosition < (checkrig() == "R6" and 0.65 or 0.7) do
+						task.wait(0.05)
+					end
+
+					if track then
+						track:Stop()
+						track:Destroy()
+					end
+				end
+			end)
+		else
+			for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+				if track.Name == "jerk" then
+					track:Stop()
+					track:Destroy()
+				end
+			end
+		end
+	end
+})
+
+local banginput = tabs.misc:AddInput("bang_input", {
+	Title = "Bang Player",
+	Default = false,
+	Finished = true,
+	Placeholder = "type username",
+	Callback = function(value)
+		value = string.lower(value)
+
+		-- Stop animation if blank or "stop" is typed
+		if value == "" or value:lower() == "stop" then
+			for _, track in ipairs(player.Character.Humanoid:GetPlayingAnimationTracks()) do
+				if track.Name == "bang" then
+					track:Stop()
+				end
+			end
+			if bangLoop then
+				bangLoop:Disconnect()
+				bangLoop = nil
+			end
+			return
+		end
+
+		local foundPlayer = false
+
+		for _, plr in pairs(game.Players:GetPlayers()) do
+			if plr ~= player then
+				local name = string.lower(plr.Name)
+				local display = string.lower(plr.DisplayName)
+				if string.find(name, value) or string.find(display, value) then
+					local char = player.Character or player.CharacterAdded:Wait()
+					local humanoid = char:FindFirstChildWhichIsA("Humanoid")
+					if not humanoid then return end
+
+					local anim = Instance.new("Animation")
+					anim.AnimationId = (checkrig() == "R6" and "rbxassetid://148840371" or "rbxassetid://5918726674")
+					anim.Name = "bang"
+					local track = humanoid:LoadAnimation(anim)
+					track:Play()
+					track:AdjustSpeed(3)
+
+					bangLoop = game:GetService("RunService").Stepped:Connect(function()
+						if not plr.Character or not plr.Character:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("HumanoidRootPart") then
+							return
+						end
+						char.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1.1)
+					end)
+
+					humanoid.Died:Connect(function()
+						bangLoop:Disconnect()
+					end)
+
+					foundPlayer = true
+					break
+				end
+			end
+		end
+
+		if not foundPlayer then
+			library:Notify({
+				Title = "error",
+				Content = "no player found",
+				Duration = 2,
+			})
+			for _, track in ipairs(player.Character.Humanoid:GetPlayingAnimationTracks()) do
+				if track.Name == "bang" then
+					track:Stop()
+				end
+			end
+			if bangLoop then
+				bangLoop:Disconnect()
+				bangLoop = nil
+			end
+		end
+	end
+})
+
+tabs.misc:AddParagraph({
+    Title = 'notice:',
+    Content = "type 'stop' or blank to stop"
+})
+
+
+--|| scripts tab ||--
+
+
+tabs.scripts:AddButton({
+	Title = "Execute <b>Infinite Yield</b>",
+	Description = 'Execute this script',
+	Callback = function()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+	end
+})
+
+tabs.scripts:AddButton({
+	Title = "Execute <b>Dex Explorer</b>",
+	Description = 'Execute this script',
+	Callback = function()
+	    loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
+	end
+})
+
+tabs.scripts:AddButton({
+	Title = "Execute <b>Remote Spy</b>",
+	Description = 'Execute this script',
+	Callback = function()
+	    loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua"))()
+	end
+})
+
+
+--|| options tab ||--
+
+createdivider(tabs.options, "Server")
+
+
+tabs.options:AddButton({
+	Title = "<b>PlaceId:</b> "..tostring(game.PlaceId),
+		Description = "Copy to clipboard",
+	Callback = function()
+		customclipboard(tostring(game.PlaceId))
+	end
+})
+
+
+tabs.options:AddButton({
+	Title = "<b>GameId:</b> "..tostring(game.GameId),
+	Description = "Copy to clipboard",
+	Callback = function()
+		customclipboard(tostring(game.GameId))
+	end
+})
+
+
+
+
+tabs.options:AddButton({
+	Title = "Rejoin <b>Server</b>",
+	Callback = function()
+		if #players:GetPlayers() <= 1 then
+			player:Kick("\nrejoining...")
+			teleportservice:Teleport(game.PlaceId, player)
+		else
+			teleportservice:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
+		end
+	end
+})
+
+tabs.options:AddButton({
+	Title = "Hop <b>Server</b>",
+	Callback = function()
+		if httprequest then
+			local servers = {}
+			local req = httprequest({
+				Url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true", game.PlaceId)
+			})
+			local body = httpservice:JSONDecode(req.Body)
+
+			if body and body.data then
+				for _, v in next, body.data do
+					if type(v) == "table" and tonumber(v.playing) and tonumber(v.maxPlayers) and v.playing < v.maxPlayers and v.id ~= game.JobId then
+						table.insert(servers, 1, v.id)
+					end
+				end
+			end
+
+			if #servers > 0 then
+				teleportservice:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], player)
+			else
+				library:Notify({
+					Title = "error",
+					Content = "no available servers found",
+					Duration = 2
+				})
+			end
+		else
+			library:Notify({
+				Title = "error",
+				Content = "executor doesn't support httprequest",
+				Duration = 2
+			})
+		end
+	end
+})
+
+
+createdivider(tabs.options, "Themes")
+
+local themedropdown = tabs.options:AddDropdown("theme_dropdown",{
+	Title = "Set <b>Theme</b>",
+	Description = "Change the interface's look",
+	Values = {'Dark','Darker','Light','Aqua','Amethyst','Rose'},
+	Default = "Darker",
+	Callback = function(value)
+		library:SetTheme(value)
+	end
+})
+
+createdivider(tabs.options, "Interface")
+
+
+local transparencytoggle = tabs.options:AddToggle("transparent_toggle", {
+	Title = "Toggle <b>Transparency</b>",
+	Description = "Make the interface transparent",
+	Default = false,
+	Callback = function(value)
+		library:ToggleTransparency(value)
+	end
+})
+
+
+local acrylictoggle = tabs.options:AddToggle("acrylic_toggle", {
+	Title = "Toggle <b>Acrylic</b>",
+	Description = "Graphics Level 8 + Transparency",
+	Default = window.Acrylic,
+	Callback = function(value)
+		library:ToggleAcrylic(value)
+		if value then
+			transparencytoggle:SetValue(true)
+		end
+	end
+})
+
+
+
+
+
+
+
+
+
+
+window:SelectTab(1)
+library:ToggleTransparency(false)
+for _, screengui in ipairs(game.CoreGui:GetChildren()) do
+	if screengui:IsA("ScreenGui") and screengui.Name == "ScreenGui" then
+
+		for _, descendant in ipairs(screengui:GetDescendants()) do
+			if descendant:IsA("TextLabel") then
+				descendant.RichText = true
+				local text = descendant.Text
+
+				-- SECTION HEADERS
+				if text:match('<font size="15">') and text:match('<b>') then
+					descendant.TextXAlignment = Enum.TextXAlignment.Left
+					descendant.TextYAlignment = Enum.TextYAlignment.Bottom
+					descendant.Size = UDim2.new(1, 0, 0, 30)
+					descendant.Position = UDim2.new(0, 5, 0, 0)
+
+					local parent = descendant.Parent
+					if parent then
+						parent.Size = UDim2.new(1, 0, 1.2, 0)
+						parent.Position = UDim2.new(0, 0, 0, 0)
+
+						local padding = parent:FindFirstChild("UIPadding")
+						if padding then padding:Destroy() end
+
+						local grandparent = parent.Parent
+						if grandparent then
+							grandparent.BackgroundTransparency = 1
+
+							local stroke = grandparent:FindFirstChild("UIStroke") or Instance.new("UIStroke", grandparent)
+							stroke.Transparency = 1
+
+							grandparent:GetPropertyChangedSignal("BackgroundTransparency"):Connect(function()
+								grandparent.BackgroundTransparency = 1
+							end)
+
+							grandparent:GetPropertyChangedSignal("Transparency"):Connect(function()
+								stroke.Transparency = 1
+							end)
+						end
+					end
+				end
+
+				-- DIVIDER LINE
+				if text:lower():match("line") then
+					local parent = descendant.Parent
+					local grandparent = parent and parent.Parent
+					if parent and grandparent then
+
+						for _, v in ipairs(parent:GetChildren()) do
+							 v:Destroy()
+						end
+
+						local function style_line()
+							parent.BackgroundColor3 = Color3.new(1, 1, 1)
+							parent.Size = UDim2.new(1, 0, 0.1, 0)
+							parent.BackgroundTransparency = 0.95
+							parent.Position = UDim2.new(0, 0, 0.5, 0)
+							grandparent.BackgroundTransparency = 1
+						end
+
+						style_line()
+
+						parent:GetPropertyChangedSignal("BackgroundTransparency"):Connect(style_line)
+						grandparent:GetPropertyChangedSignal("BackgroundTransparency"):Connect(style_line)
+						
+					end
+				end
+			end
+
+			-- TEXTBOX SIZE
+			if descendant:IsA("TextBox") and descendant.Parent:IsA("Frame") then
+				descendant.TextSize = 12
+			end
+		end
+	end
+end
